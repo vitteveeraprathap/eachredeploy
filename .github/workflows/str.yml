@@ -50,5 +50,5 @@ jobs:
           az deployment group create \
             --resource-group "${{ steps.set-rg.outputs.rgName }}" \
             --template-file infra/storageaccount/str.bicep \
-            --parameters @"infra/storageaccount/${{ github.event.inputs.environment }}.parameters.json" \
+            --parameters @"infra/storageaccount/str-${{ github.event.inputs.environment }}.parameters.json" \
             --verbose
