@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "rgName": {
-      "value": "rg-demo-uat"
+      "value": "rg-demo-dev"
     },
     "location": {
       "value": "southeastasia"

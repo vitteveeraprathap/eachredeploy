@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "storageAccountName": {
-      "value": "prodstorage87"
+      "value": "uatstorage87"
     },
     "location": {
       "value": "southeastasia"

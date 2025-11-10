@@ -11,7 +11,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     name: 'Standard_LRS'
   }
   kind: 'StorageV2'
-  properties: {}
+  properties: {
+    accessTier: 'Hot'
+  }
 }
 
 output storageAccountName string = storageAccount.name
+output storageAccountId string = storageAccount.id
