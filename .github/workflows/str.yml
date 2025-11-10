@@ -1,0 +1,32 @@
+name: Deploy Storage Account
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment (dev/uat/prod)'
+        required: true
+        type: choice
+        options: [dev, uat, prod]
+        default: dev
+      storageName:
+        description: 'Storage account name (optional, overrides param)'
+        required: false
+        default: ''
+jobs:
+  deploy-storage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Create Storage Account
+        run: |
+          ENV=${{ github.event.inputs.environment }}
+          if [ "$ENV" = "dev" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_DEV }}; LOCATION=eastus; fi
+          if [ "$ENV" = "uat" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_UAT }}; LOCATION=eastus2; fi
+          if [ "$ENV" = "prod" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_PRD }}; LOCATION=westeurope; fi
+          NAME_INPUT="${{ github.event.inputs.storageName }}"
+          if [ -n "$NAME_INPUT" ]; then SA_NAME=$NAME_INPUT; else SA_NAME="st${{ github.run_id }}"; fi
+          az storage account create --name "$SA_NAME" --resource-group "$RG_NAME" --location "$LOCATION" --sku Standard_LRS --kind StorageV2

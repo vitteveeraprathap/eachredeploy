@@ -1,0 +1,41 @@
+name: Deploy Azure Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - uat
+          - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Validate Bicep templates
+        run: |
+          az bicep build --file infra/rg.bicep
+        
+
+      - name: Deploy Resource Group
+        run: |
+          az deployment sub create \
+            --location southeastasia \
+            --template-file infra/rg.bicep \
+            --parameters @"infra/rg-${{ github.event.inputs.environment }}.parameters.json"
+
+     
