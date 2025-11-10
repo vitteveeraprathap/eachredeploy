@@ -42,12 +42,12 @@ jobs:
       
       - name: Validate Bicep template
         run: |
-          az bicep build --file infra/str/str.bicep
+          az bicep build --file infra/strorageaccount/str.bicep
       
       - name: Deploy Storage Account
         run: |
           az deployment group create \
             --resource-group "${{ steps.set-rg.outputs.rgName }}" \
             --template-file infra/str/str.bicep \
-            --parameters @"infra/str/${{ github.event.inputs.environment }}.parameters.json" \
+            --parameters @"infra/strorageaccount/${{ github.event.inputs.environment }}.parameters.json" \
             --verbose
