@@ -1,4 +1,5 @@
 name: Deploy Storage Account
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,21 +13,44 @@ on:
         description: 'Storage account name (optional, overrides param)'
         required: false
         default: ''
+
 jobs:
   deploy-storage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Determine RG name and location (same mapping used by rg.yml)
+        id: set-rg
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          if [ "$ENV" = "dev" ]; then RG_NAME="${{ secrets.RESOURCE_GROUP_DEV }}"; LOCATION="southeastasia"; fi
+          if [ "$ENV" = "uat" ]; then RG_NAME="${{ secrets.RESOURCE_GROUP_UAT }}"; LOCATION="southeastasia"; fi
+          if [ "$ENV" = "prod" ]; then RG_NAME="${{ secrets.RESOURCE_GROUP_PRD }}"; LOCATION="westeurope"; fi
+          echo "rgName=$RG_NAME" >> "$GITHUB_OUTPUT"
+          echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
+          echo "Determined RG: $RG_NAME in $LOCATION"
+        shell: bash
+
+      - name: Determine storage account name
+        id: set-sa
+        run: |
+          INPUT_NAME="${{ github.event.inputs.storageName }}"
+          if [ -n "$INPUT_NAME" ]; then SA_NAME=$INPUT_NAME; else SA_NAME="st${{ github.run_id }}"; fi
+          echo "saName=$SA_NAME" >> "$GITHUB_OUTPUT"
+        shell: bash
+
       - name: Create Storage Account
         run: |
-          ENV=${{ github.event.inputs.environment }}
-          if [ "$ENV" = "dev" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_DEV }}; LOCATION=eastus; fi
-          if [ "$ENV" = "uat" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_UAT }}; LOCATION=eastus2; fi
-          if [ "$ENV" = "prod" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_PRD }}; LOCATION=westeurope; fi
-          NAME_INPUT="${{ github.event.inputs.storageName }}"
-          if [ -n "$NAME_INPUT" ]; then SA_NAME=$NAME_INPUT; else SA_NAME="st${{ github.run_id }}"; fi
+          SA_NAME="${{ steps.set-sa.outputs.saName }}"
+          RG_NAME="${{ steps.set-rg.outputs.rgName }}"
+          LOCATION="${{ steps.set-rg.outputs.location }}"
+          echo "Creating storage account $SA_NAME in RG $RG_NAME (location $LOCATION)"
           az storage account create --name "$SA_NAME" --resource-group "$RG_NAME" --location "$LOCATION" --sku Standard_LRS --kind StorageV2
+        shell: bash
