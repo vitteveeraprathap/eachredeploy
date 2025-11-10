@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "storageAccountName": {
-      "value": "devstagee87"
+      "value": "devsstagee87"
     },
     "location": {
       "value": "southeastasia"
