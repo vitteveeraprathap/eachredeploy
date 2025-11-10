@@ -16,7 +16,7 @@ on:
 jobs:
   deploy-storage:
     runs-on: ubuntu-latest
-    
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
