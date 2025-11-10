@@ -1,4 +1,5 @@
 name: Deploy Storage Account
+
 on:
   workflow_dispatch:
     inputs:
@@ -6,27 +7,48 @@ on:
         description: 'Environment (dev/uat/prod)'
         required: true
         type: choice
-        options: [dev, uat, prod]
+        options: 
+          - dev
+          - uat
+          - prod
         default: dev
-      storageName:
-        description: 'Storage account name (optional, overrides param)'
-        required: false
-        default: ''
+
 jobs:
   deploy-storage:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: Create Storage Account
+      
+      - name: Determine Resource Group name
+        id: set-rg
         run: |
-          ENV=${{ github.event.inputs.environment }}
-          if [ "$ENV" = "dev" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_DEV }}; LOCATION=eastus; fi
-          if [ "$ENV" = "uat" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_UAT }}; LOCATION=eastus2; fi
-          if [ "$ENV" = "prod" ]; then RG_NAME=${{ secrets.RESOURCE_GROUP_PRD }}; LOCATION=westeurope; fi
-          NAME_INPUT="${{ github.event.inputs.storageName }}"
-          if [ -n "$NAME_INPUT" ]; then SA_NAME=$NAME_INPUT; else SA_NAME="st${{ github.run_id }}"; fi
-          az storage account create --name "$SA_NAME" --resource-group "$RG_NAME" --location "$LOCATION" --sku Standard_LRS --kind StorageV2
+          ENV="${{ github.event.inputs.environment }}"
+          if [ "$ENV" = "dev" ]; then 
+            RG_NAME="${{ secrets.RESOURCE_GROUP_DEV }}"
+          elif [ "$ENV" = "uat" ]; then 
+            RG_NAME="${{ secrets.RESOURCE_GROUP_UAT }}"
+          elif [ "$ENV" = "prod" ]; then 
+            RG_NAME="${{ secrets.RESOURCE_GROUP_PRD }}"
+          fi
+          echo "rgName=$RG_NAME" >> "$GITHUB_OUTPUT"
+          echo "Deploying to Resource Group: $RG_NAME"
+        shell: bash
+      
+      - name: Validate Bicep template
+        run: |
+          az bicep build --file infra/storageaccount/str.bicep
+      
+      - name: Deploy Storage Account
+        run: |
+          az deployment group create \
+            --resource-group "${{ steps.set-rg.outputs.rgName }}" \
+            --template-file infra/storageaccount/str.bicep \
+            --parameters @"infra/storageaccount/str-${{ github.event.inputs.environment }}.parameters.json" \
+            --verbose
