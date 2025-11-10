@@ -16,6 +16,7 @@ on:
 jobs:
   deploy-storage:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,6 +49,6 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "${{ steps.set-rg.outputs.rgName }}" \
-            --template-file infra/str/str.bicep \
+            --template-file infra/storageaccount/str.bicep \
             --parameters @"infra/storageaccount/${{ github.event.inputs.environment }}.parameters.json" \
             --verbose
