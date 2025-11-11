@@ -12,6 +12,11 @@ on:
           - dev
           - uat
           - prod
+      skip_whatif:
+        description: "Skip what-if analysis"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -24,18 +29,53 @@ jobs:
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ github.event.inputs.environment == 'dev' && secrets.AZURE_CREDENTIALS_DEV || github.event.inputs.environment == 'uat' && secrets.AZURE_CREDENTIALS_UAT || secrets.AZURE_CREDENTIALS_PRD }}
+
+      - name: Bicep Lint
+        run: |
+          echo "::group::Running Bicep Linter"
+          az bicep lint --file infra/resourcegroup/rg.bicep
+          echo "::endgroup::"
 
       - name: Validate Bicep templates
         run: |
+          echo "::group::Building Bicep Template"
           az bicep build --file infra/resourcegroup/rg.bicep
-        
+          echo "::endgroup::"
 
-      - name: Deploy Resource Group
+      - name: What-If Analysis
+        if: ${{ !inputs.skip_whatif }}
         run: |
-          az deployment sub create \
+          echo "::group::Running What-If Analysis"
+          az deployment sub what-if \
             --location southeastasia \
             --template-file infra/resourcegroup/rg.bicep \
-            --parameters @"infra/resourcegroup/rg-${{ github.event.inputs.environment }}.parameters.json"
+            --parameters @"infra/resourcegroup/rg-${{ github.event.inputs.environment }}.parameters.json" \
+            --result-format FullResourcePayloads
+          echo "::endgroup::"
 
-     
+      - name: Deploy Resource Group
+        id: deploy-rg
+        run: |
+          echo "::group::Deploying Resource Group"
+          DEPLOYMENT_OUTPUT=$(az deployment sub create \
+            --location southeastasia \
+            --template-file infra/resourcegroup/rg.bicep \
+            --parameters @"infra/resourcegroup/rg-${{ github.event.inputs.environment }}.parameters.json" \
+            --query 'properties.outputs.resourceGroupName.value' \
+            --output tsv)
+          
+          echo "resourceGroupName=$DEPLOYMENT_OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "Resource Group deployed: $DEPLOYMENT_OUTPUT"
+          echo "::endgroup::"
+
+      - name: Display Deployment Summary
+        run: |
+          echo "### Deployment Summary " >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ github.event.inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Resource Group** | ${{ steps.deploy-rg.outputs.resourceGroupName }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Location** | southeastasia |" >> $GITHUB_STEP_SUMMARY
+          echo "| **What-If Run** | ${{ inputs.skip_whatif && '❌ Skipped' || '✅ Executed' }} |" >> $GITHUB_STEP_SUMMARY
