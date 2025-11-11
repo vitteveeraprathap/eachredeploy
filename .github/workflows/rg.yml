@@ -24,18 +24,29 @@ jobs:
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ github.event.inputs.environment == 'dev' && secrets.AZURE_CREDENTIALS_DEV || github.event.inputs.environment == 'uat' && secrets.AZURE_CREDENTIALS_UAT || secrets.AZURE_CREDENTIALS_PRD }}
 
       - name: Validate Bicep templates
         run: |
           az bicep build --file infra/resourcegroup/rg.bicep
-        
 
       - name: Deploy Resource Group
+        id: deploy-rg
         run: |
-          az deployment sub create \
+          DEPLOYMENT_OUTPUT=$(az deployment sub create \
             --location southeastasia \
             --template-file infra/resourcegroup/rg.bicep \
-            --parameters @"infra/resourcegroup/rg-${{ github.event.inputs.environment }}.parameters.json"
+            --parameters @"infra/resourcegroup/rg-${{ github.event.inputs.environment }}.parameters.json" \
+            --query 'properties.outputs.resourceGroupName.value' \
+            --output tsv)
+          
+          echo "resourceGroupName=$DEPLOYMENT_OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "Resource Group deployed: $DEPLOYMENT_OUTPUT"
 
-     
+      - name: Display Deployment Summary
+        run: |
+          echo "### Deployment Summary " >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Group:** ${{ steps.deploy-rg.outputs.resourceGroupName }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Location:** southeastasia" >> $GITHUB_STEP_SUMMARY
