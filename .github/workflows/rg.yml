@@ -21,29 +21,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Azure Credentials based on environment
-        id: set-creds
-        run: |
-          ENV="${{ github.event.inputs.environment }}"
-          if [ "$ENV" = "dev" ]; then
-            echo "AZURE_CREDS<<EOF" >> $GITHUB_ENV
-            echo "${{ secrets.AZURE_CREDENTIALS_DEV }}" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-          elif [ "$ENV" = "uat" ]; then
-            echo "AZURE_CREDS<<EOF" >> $GITHUB_ENV
-            echo "${{ secrets.AZURE_CREDENTIALS_UAT }}" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-          elif [ "$ENV" = "prod" ]; then
-            echo "AZURE_CREDS<<EOF" >> $GITHUB_ENV
-            echo "${{ secrets.AZURE_CREDENTIALS_PRD }}" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-          fi
-        shell: bash
-
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ env.AZURE_CREDS }}
+          creds: ${{ 
+            github.event.inputs.environment == 'dev' && secrets.AZURE_CREDENTIALS_DEV ||
+            github.event.inputs.environment == 'uat' && secrets.AZURE_CREDENTIALS_UAT ||
+            github.event.inputs.environment == 'prod' && secrets.AZURE_CREDENTIALS_PRD
+          }}
 
       - name: Validate Bicep templates
         run: |
